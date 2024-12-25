@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #ddd;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --high-risk-bg: #ffebee;
+            --medium-risk-bg: #fff3e0;
+            --low-risk-bg: #e8f5e9;
+            --high-risk-text: #d32f2f;
+            --medium-risk-text: #ef6c00;
+            --low-risk-text: #2e7d32;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --border-color: #404040;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            --high-risk-bg: rgba(211, 47, 47, 0.2);
+            --medium-risk-bg: rgba(239, 108, 0, 0.2);
+            --low-risk-bg: rgba(46, 125, 50, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #map {
+            width: 70%;
+            height: 100vh;
+        }
+
+        .side-panel {
+            width: 30%;
+            padding: 20px;
+            background-color: var(--bg-secondary);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 8px 16px;
+            cursor: pointer;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .controls {
+            background-color: var(--bg-primary);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9em;
+        }
+
+        .total-stats {
+            background-color: var(--bg-primary);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stat-item {
+            text-align: left;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .risk-levels {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .risk-category {
+            flex: 1;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .risk-category.high-risk {
+            background-color: var(--high-risk-bg);
+            color: var(--high-risk-text);
+        }
+
+        .risk-category.medium-risk {
+            background-color: var(--medium-risk-bg);
+            color: var(--medium-risk-text);
+        }
+
+        .risk-category.low-risk {
+            background-color: var(--low-risk-bg);
+            color: var(--low-risk-text);
+        }
+
+        .risk-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .popup-content {
+            padding: 10px;
+            line-height: 1.5;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.6.0/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.6.0/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="side-panel">
+            <div class="panel-header">
+                <h2>Storm Risk Monitor</h2>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                    <span>Dark Mode</span>
+                </button>
+            </div>
+            
+            <div class="controls">
+                <div class="form-group">
+                    <label>Risk Type</label>
+                    <select>
+                        <option>Storm Risk</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Base Map</label>
+                    <select>
+                        <option>Street Map</option>
+                        <option>Satellite</option>
+                        <option>Terrain</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>GPS Coordinates</label>
+                    <input type="text" placeholder="e.g., -29.151591, 26:188980">
+                </div>
+            </div>
+
+            <div class="total-stats">
+                <div class="stats-header">
+                    <div class="stat-item">
+                        <div class="stat-label">Total Policies</div>
+                        <div class="stat-value">15</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Expected Loss</div>
+                        <div class="stat-value" style="color: var(--high-risk-text)">R 8,267,255.90</div>
+                    </div>
+                </div>
+                
+                <div class="risk-levels">
+                    <div class="risk-category high-risk">
+                        <div>High Risk</div>
+                        <div class="risk-value">5</div>
+                    </div>
+                    <div class="risk-category medium-risk">
+                        <div>Medium Risk</div>
+                        <div class="risk-value">5</div>
+                    </div>
+                    <div class="risk-category low-risk">
+                        <div>Low Risk</div>
+                        <div class="risk-value">5</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode toggle functionality
+        function toggleTheme() {
+            const body = document.body;
+            const button = document.querySelector('.theme-toggle');
+            const icon = button.querySelector('i');
+            const span = button.querySelector('span');
+            
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                icon.className = 'fas fa-moon';
+                span.textContent = 'Dark Mode';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                icon.className = 'fas fa-sun';
+                span.textContent = 'Light Mode';
+            }
+        }
+
+        // Initialize map
+        var map = L.map('map', {
+            center: [-29.0, 24.0],
+            zoom: 6
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Markers data
+        var markers = [
+            {lat: -27.51425463604201, lng: 22.921282529612434, risk: 'High Risk', policy: '3884135226', value: 'R703,107'},
+            {lat: -24.76666284819573, lng: 18.69641369158306, risk: 'Low Risk', policy: '5283590187', value: 'R757,981'},
+            {lat: -32.29042607612058, lng: 26.723921349445035, risk: 'Low Risk', policy: '7228440771', value: 'R1,155,233'},
+            {lat: -28.48394395283424, lng: 20.052906522608588, risk: 'High Risk', policy: '3958674509', value: 'R977,607'},
+            {lat: -28.58866294757648, lng: 26.431367609172113, risk: 'Low Risk', policy: '2168738089', value: 'R1,395,911'},
+            {lat: -34.547217534702874, lng: 21.151648246785484, risk: 'Medium Risk', policy: '6620783864', value: 'R1,908,357'},
+            {lat: -30.131061199038832, lng: 18.05020209697454, risk: 'High Risk', policy: '3373530373', value: 'R1,673,379'},
+            {lat: -24.19589940561556, lng: 22.04594568011835, risk: 'Medium Risk', policy: '5791733564', value: 'R790,369'},
+            {lat: -32.13003173408521, lng: 27.64243210229809, risk: 'High Risk', policy: '1158794833', value: 'R1,960,048'},
+            {lat: -24.03872900566686, lng: 24.782951582516684, risk: 'Low Risk', policy: '3076272491', value: 'R622,800'},
+            {lat: -29.13720106091358, lng: 20.803498149162305, risk: 'High Risk', policy: '3830637049', value: 'R1,768,955'},
+            {lat: -23.36579214303918, lng: 18.00461879805542, risk: 'Low Risk', policy: '5961848325', value: 'R378,752'},
+            {lat: -24.203605970032882, lng: 31.06807060690978, risk: 'High Risk', policy: '6684538050', value: 'R1,471,052'},
+            {lat: -31.42851904210381, lng: 19.145294285945905, risk: 'High Risk', policy: '9614290637', value: 'R600,394'},
+            {lat: -33.44227421445549, lng: 28.003622949547662, risk: 'High Risk', policy: '3250914490', value: 'R1,795,600'}
+        ];
+
+        // Add markers to map
+        markers.forEach(marker => {
+            var color = marker.risk === 'High Risk' ? '#d32f2f' : 
+                       marker.risk === 'Medium Risk' ? '#ef6c00' : '#2e7d32';
+            
+            var markerIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `
+                <div style="background-color: #1976d2; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-cloud" style="color: white; font-size: 12px;"></i>
+                </div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        var stormEndIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `
+                <div style="background-color: #1976d2; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-flag-checkered" style="color: white; font-size: 12px;"></i>
+                </div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        // Add storm markers
+        L.marker([-30.0, 20.0], {icon: stormStartIcon})
+            .bindTooltip('Storm Start', { permanent: false, direction: 'right' })
+            .addTo(map);
+            
+        L.marker([-28.0, 31.0], {icon: stormEndIcon})
+            .bindTooltip('Storm End', { permanent: false, direction: 'left' })
+            .addTo(map);
+
+        // Base map change handler
+        document.querySelector('select:nth-child(2)').addEventListener('change', function(e) {
+            const mapStyles = {
+                'Street Map': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'Satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                'Terrain': 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+            };
+            
+            map.eachLayer((layer) => {
+                if (layer instanceof L.TileLayer) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            L.tileLayer(mapStyles[e.target.value], {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        });
+    </script>
+</body>
+</html> `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [15, 15],
+                iconAnchor: [8, 8]
+            });
+
+            L.marker([marker.lat, marker.lng], {icon: markerIcon})
+                .bindPopup(`
+                    <div class="popup-content">
+                        <b>Policy Number:</b> ${marker.policy}<br>
+                        <b>Coordinates:</b> ${marker.lat.toFixed(6)}, ${marker.lng.toFixed(6)}<br>
+                        <b>Policy Value:</b> ${marker.value}<br>
+                        <b>Risk Level:</b> ${marker.risk}
+                    </div>
+                `)
+                .addTo(map);
+        });
+
+        // Add storm path
+        L.polyline([
+            [-30.0, 20.0],
+            [-29.5, 23.0],
+            [-29.0, 26.0],
+            [-28.5, 29.0],
+            [-28.0, 31.0]
+        ], {
+            color: '#1976d2',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '8, 8'
+        }).addTo(map);
+
+        // Custom storm icons
+        var stormStartIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `
+                <div style="background-color: #1976d2; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-cloud" style="color: white; font-size: 12px;"></i>
+                </div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        var stormEndIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `
+                <div style="background-color: #1976d2; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center;">
+                    <i class="fas fa-flag-checkered" style="color: white; font-size: 12px;"></i>
+                </div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        // Add storm markers
+        L.marker([-30.0, 20.0], {icon: stormStartIcon})
+            .bindTooltip('Storm Start', { permanent: false, direction: 'right' })
+            .addTo(map);
+            
+        L.marker([-28.0, 31.0], {icon: stormEndIcon})
+            .bindTooltip('Storm End', { permanent: false, direction: 'left' })
+            .addTo(map);
+
+        // Base map change handler
+        document.querySelector('select:nth-child(2)').addEventListener('change', function(e) {
+            const mapStyles = {
+                'Street Map': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'Satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                'Terrain': 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+            };
+            
+            map.eachLayer((layer) => {
+                if (layer instanceof L.TileLayer) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            L.tileLayer(mapStyles[e.target.value], {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        });
+    </script>
+</body>
+</html>

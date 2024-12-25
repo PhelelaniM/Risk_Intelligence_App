@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storm Risk Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turf.js/6.5.0/turf.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f8fafc;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.75rem 1.5rem;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        @media (min-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+            height: 500px;
+            padding: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: 100%;
+            border-radius: 0.375rem;
+        }
+
+        .tabs {
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+
+        .tab-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab {
+            padding: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            background: #f8fafc;
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #2563eb;
+            border-bottom: 2px solid #2563eb;
+        }
+
+        .tab:hover:not(.active) {
+            background: #f1f5f9;
+        }
+
+        .tab-content {
+            padding: 1rem;
+        }
+
+        .risk-assessment {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .risk-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-box {
+            padding: 0.75rem;
+            background: #f8fafc;
+            border-radius: 0.375rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .stat-value.danger {
+            color: #dc2626;
+            font-size: 1rem;
+        }
+
+        .risk-levels {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        .risk-level {
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            text-align: center;
+        }
+
+        .risk-level.high {
+            background: #fee2e2;
+        }
+
+        .risk-level.medium {
+            background: #fef3c7;
+        }
+
+        .risk-level.low {
+            background: #dcfce7;
+        }
+
+        .risk-level-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+
+        .risk-level-value {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .risk-level.high .risk-level-value {
+            color: #dc2626;
+        }
+
+        .risk-level.medium .risk-level-value {
+            color: #d97706;
+        }
+
+        .risk-level.low .risk-level-value {
+            color: #16a34a;
+        }
+
+        .policy-marker {
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            border: 2px solid white;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+        }
+
+        .policy-marker.high {
+            background-color: #dc2626;
+        }
+
+        .policy-marker.medium {
+            background-color: #d97706;
+        }
+
+        .policy-marker.low {
+            background-color: #16a34a;
+        }
+
+        .policy-popup {
+            padding: 0.75rem;
+            min-width: 200px;
+        }
+
+        .policy-popup h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .policy-popup p {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+
+        .insights-section {
+            padding: 1rem;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 0.5rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        .generate-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .analyzing {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .analyzing::before {
+            content: "🤔";
+        }
+
+        .insights-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .insights-list li {
+            font-size: 0.875rem;
+            color: #1e293b;
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            position: relative;
+        }
+
+        .insights-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0.5rem;
+            color: #2563eb;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .risk-badge.high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .risk-badge.medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .risk-badge.low {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Storm Risk Monitor</h1>
+    </header>
+
+    <div class="container">
+        <div class="dashboard-grid">
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([-29.0, 24.0], 6);
+        
+        // Add a styled tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            className: 'map-tiles'
+        }).addTo(map);
+
+        // Custom icon function
+        function createCustomIcon(riskLevel) {
+            const markerHtmlStyles = `
+                background-color: ${riskLevel === 'high' ? '#dc2626' : riskLevel === 'medium' ? '#d97706' : '#16a34a'};
+                width: 2rem;
+                height: 2rem;
+                display: block;
+                left: -1rem;
+                top: -1rem;
+                position: relative;
+                border-radius: 2rem;
+                border: 2px solid white;
+                box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+            `;
+
+            return L.divIcon({
+                className: "policy-marker",
+                iconAnchor: [0, 0],
+                html: `<span style="${markerHtmlStyles}" />`
+            });
+        }
+
+        // Storm path coordinates
+        const stormPath = [
+            [-34.0, 18.5], // Cape Town area
+            [-33.0, 22.0],
+            [-31.0, 25.0],
+            [-29.0, 28.0],
+            [-27.0, 30.0]  // Towards Durban
+        ];
+
+        // Draw storm path
+        const stormLine = L.polyline(stormPath, {
+            color: '#2563eb',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 10'
+        }).addTo(map);
+
+        // Calculate distance from point to storm path
+        function getDistanceFromStormPath(point) {
+            const line = turf.lineString(stormPath);
+            const pt = turf.point([point[1], point[0]]);
+            return turf.pointToLineDistance(pt, line, {units: 'kilometers'});
+        }
+
+        // Generate dummy policies with risk levels based on storm path proximity
+        function generateDummyPolicies() {
+            const cities = [
+                [-33.9249, 18.4241, "Cape Town"],
+                [-29.8587, 31.0218, "Durban"],
+                [-26.2041, 28.0473, "Johannesburg"],
+                [-33.9321, 25.5703, "Port Elizabeth"],
+                [-29.1167, 26.2167, "Bloemfontein"],
+                [-25.7479, 28.2293, "Pretoria"],
+                [-26.8652, 26.6676, "Klerksdorp"],
+                [-28.7282, 24.7499, "Kimberley"],
+                [-32.9921, 27.8678, "East London"],
+                [-25.8657, 29.2516, "Witbank"],
+                [-26.6716, 27.0918, "Potchefstroom"],
+                [-27.7567, 30.7951, "Vryheid"],
+                [-31.8925, 26.8753, "Queenstown"],
+                [-25.4669, 30.9850, "Nelspruit"],
+                [-23.9045, 29.4688, "Polokwane"]
+            ];
+
+            return cities.map(([lat, lng, city]) => {
+                const distance = getDistanceFromStormPath([lat, lng]);
+                let riskLevel;
+                if (distance < 50) riskLevel = 'high';
+                else if (distance < 100) riskLevel = 'medium';
+                else riskLevel = 'low';
+
+                return {
+                    id: Math.floor(Math.random() * 9000000000) + 1000000000,
+                    coordinates: [lat, lng],
+                    city,
+                    value: Math.floor(Math.random() * (2000000 - 200000) + 200000),
+                    riskLevel,
+                    distance: Math.round(distance)
+                };
+            });
+        }
+
+        // Add policy markers
+        const policies = generateDummyPolicies();
+        policies.forEach(policy => {
+            const marker = L.marker(policy.coordinates, {
+                icon: createCustomIcon(policy.riskLevel)
+            }).bindPopup(`
+                <div class="policy-popup">
+                    <h3>Policy #${policy.id}</h3>
+                    <p>Location: ${policy.city}</p>
+                    <p>Coordinates: ${policy.coordinates[0].toFixed(6)}, ${policy.coordinates[1].toFixed(6)}</p>
+                    <p>Value: R ${policy.value.toLocaleString()}</p>
+                    <p>Distance from storm: ${policy.distance}km</p>
+                    <div class="risk-badge ${policy.riskLevel}">
+                        ${policy.riskLevel.toUpperCase()} RISK
+                    </div>
+                </div>
+            `, {
+                className: 'custom-popup'
+            });
+            marker.addTo(map);
+        });
+
+        // Add buffer zone around storm path
+        const buffer = turf.buffer(turf.lineString(stormPath), 50, {units: 'kilometers'});
+        L.geoJSON(buffer, {
+            style: {
+                color: '#2563eb',
+                weight: 1,
+                opacity: 0.2,
+                fillOpacity: 0.1
+            }
+        }).addTo(map);
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.id === 'generateInsights') return;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+                document.getElementById(`${tab.dataset.tab}-content`).style.display = 'block';
+            });
+        });
+
+        // Insights generation with animation
+        document.getElementById('generateInsights').addEventListener('click', async () => {
+            const insightsOutput = document.getElementById('insightsOutput');
+            
+            // Show analyzing state
+            insightsOutput.innerHTML = `
+                <div class="analyzing">
+                    Analyzing storm path and policy risks...
+                </div>
+            `;
+
+            // Simulate analysis delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const highRiskPolicies = policies.filter(p => p.riskLevel === 'high');
+            const totalExposure = policies.reduce((sum, p) => {
+                const riskMultiplier = p.riskLevel === 'high' ? 0.8 : p.riskLevel === 'medium' ? 0.4 : 0.1;
+                return sum + (p.value * riskMultiplier);
+            }, 0);
+
+            const insights = `
+                <ul class="insights-list">
+                    <li>${highRiskPolicies.length} high-risk policies identified in direct storm path</li>
+                    <li>Recommended immediate notification to policy holders within 50km buffer</li>
+                    <li>Estimated total exposure: R ${totalExposure.toLocaleString()}</li>
+                    <li>Storm predicted to intensify near ${highRiskPolicies[0]?.city || 'urban'} area</li>
+                </ul>
+                <h3 style="margin: 1rem 0 0.5rem; font-size: 0.875rem; font-weight: 500;">📋 Recommended Actions:</h3>
+                <ul class="insights-list">
+                    <li>Deploy emergency response teams to high-risk areas</li>
+                    <li>Issue SMS alerts to affected policy holders</li>
+                    <li>Activate disaster recovery protocols</li>
+                    <li>Prepare claims processing teams for potential influx</li>
+                </ul>
+            `;
+            
+            insightsOutput.innerHTML = insights;
+        });
+
+        // Initialize with calculator tab active
+        document.getElementById('calculator-content').style.display = 'block';
+        document.getElementById('insights-content').style.display = 'none';
+    </script>
+</body>
+</html>
+
+            <div class="tabs">
+                <div class="tab-list">
+                    <button class="tab active" data-tab="calculator">Risk Calculator</button>
+                    <button class="tab" data-tab="insights">Insights</button>
+                </div>
+
+                <div class="tab-content" id="calculator-content">
+                    <div class="risk-assessment">
+                        <h2 class="risk-title">Total Risk Assessment</h2>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <p class="stat-label">Total Policies</p>
+                                <p class="stat-value">15</p>
+                            </div>
+                            <div class="stat-box">
+                                <p class="stat-label">Expected Loss</p>
+                                <p class="stat-value danger">R 8,267,255.90</p>
+                            </div>
+                        </div>
+                        <div class="risk-levels">
+                            <div class="risk-level high">
+                                <p class="risk-level-label">High Risk</p>
+                                <p class="risk-level-value">5</p>
+                            </div>
+                            <div class="risk-level medium">
+                                <p class="risk-level-label">Medium Risk</p>
+                                <p class="risk-level-value">5</p>
+                            </div>
+                            <div class="risk-level low">
+                                <p class="risk-level-label">Low Risk</p>
+                                <p class="risk-level-value">5</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="insights-content" style="display: none;">
+                    <div class="insights-section">
+                        <button id="generateInsights" class="generate-btn">
+                            Generate Insights
+                        </button>
+                        <div id="insightsOutput"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>

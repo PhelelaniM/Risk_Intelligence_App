@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storm Risk Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        .risk-high { background-color: #ff4444; color: white; }
+        .risk-medium { background-color: #ffbb33; color: black; }
+        .risk-low { background-color: #00C851; color: white; }
+        .map-container { height: 60vh; }
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: rgba(255,255,255,0.9);
+            border-radius: 8px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Storm Risk Monitor</h1>
+            <p class="text-gray-600">Geographic Risk Analysis Tool</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Risk Type</label>
+                    <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" id="riskType">
+                        <option>Storm Risk</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Base Map</label>
+                    <select class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" id="baseMap">
+                        <option>Street Map</option>
+                        <option>Satellite</option>
+                        <option>Light</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">GPS Coordinates</label>
+                    <input type="text" id="coordinates" placeholder="-29.151591, 26.188980" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+            </div>
+            
+            <div class="map-container rounded-lg overflow-hidden" id="map"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Risk Calculator</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Policies</p>
+                        <p class="text-2xl font-bold">15</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Expected Loss</p>
+                        <p class="text-2xl font-bold text-red-600" id="expectedLoss">R 8,267,255.90</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="p-3 bg-red-100 rounded">
+                        <p class="text-sm">High Risk</p>
+                        <p class="text-xl font-bold">5</p>
+                    </div>
+                    <div class="p-3 bg-yellow-100 rounded">
+                        <p class="text-sm">Medium Risk</p>
+                        <p class="text-xl font-bold">5</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded">
+                        <p class="text-sm">Low Risk</p>
+                        <p class="text-xl font-bold">5</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Insights</h2>
+                <button id="generateInsights" class="mb-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Generate Insights
+                </button>
+                <div id="insightsContent" class="prose">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="space-y-3 mt-4">
+                            <div class="h-4 bg-gray-200 rounded"></div>
+                            <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([-29.0, 24.0], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        // Dummy policy data generator
+        function generateDummyPolicies() {
+            const policies = [];
+            const riskLevels = ['low', 'medium', 'high'];
+            const coordinates = [
+                [-26.2041, 28.0473], // Johannesburg
+                [-33.9249, 18.4241], // Cape Town
+                [-29.8587, 31.0218], // Durban
+                [-25.7479, 28.2293], // Pretoria
+                [-32.9921, 27.8678], // East London
+                [-26.8652, 26.6676], // Klerksdorp
+                [-28.7282, 24.7499], // Kimberley
+                [-33.9321, 25.5703], // Port Elizabeth
+                [-29.1167, 26.2167], // Bloemfontein
+                [-25.8657, 29.2516], // Witbank
+                [-26.6716, 27.0918], // Potchefstroom
+                [-27.7567, 30.7951], // Vryheid
+                [-31.8925, 26.8753], // Queenstown
+                [-25.4669, 30.9850], // Nelspruit
+                [-23.9045, 29.4688]  // Polokwane
+            ];
+
+            for (let i = 0; i < 15; i++) {
+                const riskLevel = riskLevels[Math.floor(i / 5)];
+                const policyValue = Math.floor(Math.random() * (2000000 - 200000) + 200000);
+                policies.push({
+                    id: Math.floor(Math.random() * 9000000000) + 1000000000,
+                    coordinates: coordinates[i],
+                    value: policyValue,
+                    risk: riskLevel
+                });
+            }
+            return policies;
+        }
+
+        // Add markers for policies
+        const policies = generateDummyPolicies();
+        policies.forEach(policy => {
+            const marker = L.marker(policy.coordinates)
+                .bindPopup(`
+                    <div class="p-4">
+                        <h3 class="font-bold">Policy #${policy.id}</h3>
+                        <p>Coordinates: ${policy.coordinates.join(', ')}</p>
+                        <p>Value: R ${policy.value.toLocaleString()}</p>
+                        <div class="mt-2 p-2 text-center risk-${policy.risk}">
+                            ${policy.risk.toUpperCase()} RISK
+                        </div>
+                    </div>
+                `);
+            marker.addTo(map);
+        });
+
+        // Storm path simulation
+        const stormPath = L.polyline([
+            [-34.0, 18.0],
+            [-30.0, 25.0],
+            [-26.0, 28.0],
+            [-24.0, 31.0]
+        ], {
+            color: 'red',
+            weight: 3,
+            dashArray: '5, 10'
+        }).addTo(map);
+
+        // Generate insights
+        document.getElementById('generateInsights').addEventListener('click', function() {
+            const insights = `
+                <div class="space-y-4">
+                    <p class="font-medium">🤔 Analyzing storm path and policy risks...</p>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li>5 high-risk policies identified in direct storm path</li>
+                        <li>Recommended immediate notification to policy holders within 10km buffer</li>
+                        <li>Estimated total exposure: R 8,267,255.90</li>
+                        <li>Storm predicted to intensify near Johannesburg area</li>
+                    </ul>
+                    <p class="font-medium mt-4">📋 Recommended Actions:</p>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li>Deploy emergency response teams to high-risk areas</li>
+                        <li>Issue SMS alerts to affected policy holders</li>
+                        <li>Activate disaster recovery protocols</li>
+                    </ul>
+                </div>
+            `;
+            document.getElementById('insightsContent').innerHTML = insights;
+        });
+    </script>
+</body>
+</html>

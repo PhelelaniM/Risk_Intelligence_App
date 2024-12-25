@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <title>Storm Risk Monitor</title>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+    
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #ddd;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --high-risk-bg: #ffebee;
+            --medium-risk-bg: #fff3e0;
+            --low-risk-bg: #e8f5e9;
+            --high-risk-text: #d32f2f;
+            --medium-risk-text: #ef6c00;
+            --low-risk-text: #2e7d32;
+            --accent-color: #1a1a1a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            padding: 1rem 2rem;
+            background-color: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .content-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid var(--border-color);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .data-source {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        .sidebar {
+            width: 400px;
+            background-color: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .tab-container {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <header class="header">
+            <h1>Storm Risk Monitor</h1>
+        </header>
+
+        <div class="content-container">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="data-source">Data Source: NASA</div>
+            </div>
+
+            <div class="sidebar">
+                <div class="tab-container">
+                    <div class="tab-buttons">
+                        <button class="tab-button" onclick="showTab('calculator')">Risk Calculator</button>
+                        <button class="tab-button active" onclick="showTab('insights')">Insights</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+<!-- Add before closing body tag -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+// Initialize map
+var map = L.map('map', {
+    center: [-29.0, 24.0],
+    zoom: 6
+});
+
+// Base layers
+var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors | Data Source: NASA'
+});
+
+var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri | Data Source: NASA'
+});
+
+// Create feature groups for different layers
+var markersLayer = L.featureGroup();
+var stormLayer = L.featureGroup();
+
+// Add the tropical storm path
+var stormPath = L.polyline([
+    [-30.0, 20.0],
+    [-29.5, 23.0],
+    [-29.0, 26.0],
+    [-28.5, 29.0],
+    [-28.0, 31.0]
+], {
+    color: '#1a1a1a',
+    weight: 4,
+    opacity: 0.8,
+    dashArray: '8, 8'
+}).bindPopup(`
+    <div class="popup-content">
+        <b>Observed Track: Tropical Storm</b><br>
+        Storm Number: 17-20<br>
+        Storm Type: Tropical Storm<br>
+        Basin: South Indian Basin<br>
+        Storm Name: Filip<br>
+        Start Date: 3/10/2024 8:00 PM<br>
+        End Date: 3/13/2024<br>
+        Storm ID: gh772024
+    </div>
+`);
+
+// Add layers to feature groups
+stormLayer.addLayer(stormPath);
+
+// Create layer control
+var baseMaps = {
+    "Street Map": osmLayer,
+    "Satellite": satelliteLayer
+};
+
+var overlayMaps = {
+    "Storm Track": stormLayer,
+    "Risk Markers": markersLayer
+};
+
+// Add default layer and controls
+osmLayer.addTo(map);
+L.control.layers(baseMaps, overlayMaps).addTo(map);
+stormLayer.addTo(map);
+markersLayer.addTo(map);
+
+// Custom storm icons
+var stormStartIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+        <div style="background-color: #1a1a1a; width: 24px; height: 24px; border-radius: 50%; 
+             border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); 
+             display: flex; justify-content: center; align-items: center;">
+            <i class="fas fa-cloud" style="color: white; font-size: 12px;"></i>
+        </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+});
+
+var stormEndIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+        <div style="background-color: #1a1a1a; width: 24px; height: 24px; border-radius: 50%; 
+             border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3); 
+             display: flex; justify-content: center; align-items: center;">
+            <i class="fas fa-flag-checkered" style="color: white; font-size: 12px;"></i>
+        </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+});
+
+// Add storm markers
+L.marker([-30.0, 20.0], {icon: stormStartIcon})
+    .bindTooltip('Storm Start', { permanent: false, direction: 'right' })
+    .addTo(stormLayer);
+    
+L.marker([-28.0, 31.0], {icon: stormEndIcon})
+    .bindTooltip('Storm End', { permanent: false, direction: 'left' })
+    .addTo(stormLayer);
+
+// Add marker data
+var markers = [
+            {lat: -27.51425463604201, lng: 22.921282529612434, risk: 'High Risk', policy: '3884135226', value: 'R703,107'},
+            {lat: -24.76666284819573, lng: 18.69641369158306, risk: 'Low Risk', policy: '5283590187', value: 'R757,981'},
+            {lat: -32.29042607612058, lng: 26.723921349445035, risk: 'Low Risk', policy: '7228440771', value: 'R1,155,233'},
+            {lat: -28.48394395283424, lng: 20.052906522608588, risk: 'High Risk', policy: '3958674509', value: 'R977,607'},
+            {lat: -28.58866294757648, lng: 26.431367609172113, risk: 'Low Risk', policy: '2168738089', value: 'R1,395,911'},
+            {lat: -34.547217534702874, lng: 21.151648246785484, risk: 'Medium Risk', policy: '6620783864', value: 'R1,908,357'},
+            {lat: -30.131061199038832, lng: 18.05020209697454, risk: 'High Risk', policy: '3373530373', value: 'R1,673,379'},
+            {lat: -24.19589940561556, lng: 22.04594568011835, risk: 'Medium Risk', policy: '5791733564', value: 'R790,369'},
+            {lat: -32.13003173408521, lng: 27.64243210229809, risk: 'High Risk', policy: '1158794833', value: 'R1,960,048'},
+            {lat: -24.03872900566686, lng: 24.782951582516684, risk: 'Low Risk', policy: '3076272491', value: 'R622,800'},
+            {lat: -29.13720106091358, lng: 20.803498149162305, risk: 'High Risk', policy: '3830637049', value: 'R1,768,955'},
+            {lat: -23.36579214303918, lng: 18.00461879805542, risk: 'Low Risk', policy: '5961848325', value: 'R378,752'},
+            {lat: -24.203605970032882, lng: 31.06807060690978, risk: 'High Risk', policy: '6684538050', value: 'R1,471,052'},
+            {lat: -31.42851904210381, lng: 19.145294285945905, risk: 'High Risk', policy: '9614290637', value: 'R600,394'},
+            {lat: -33.44227421445549, lng: 28.003622949547662, risk: 'High Risk', policy: '3250914490', value: 'R1,795,600'}
+        ];
+
+// Add markers to map
+markers.forEach(marker => {
+    var color = marker.risk === 'High Risk' ? '#d32f2f' : 
+                marker.risk === 'Medium Risk' ? '#ef6c00' : '#2e7d32';
+    
+    var markerIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; 
+               border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [15, 15],
+        iconAnchor: [8, 8]
+    });
+
+    L.marker([marker.lat, marker.lng], {icon: markerIcon})
+        .bindPopup(`
+            <div class="popup-content">
+                <b>Policy Number:</b> ${marker.policy}<br>
+                <b>Coordinates:</b> ${marker.lat.toFixed(6)}, ${marker.lng.toFixed(6)}<br>
+                <b>Policy Value:</b> ${marker.value}<br>
+                <b>Risk Level:</b> ${marker.risk}
+            </div>
+        `)
+        .addTo(markersLayer);
+});
+</script>
+</script>
+
+<!-- Insights Tab Content -->
+<div class="risk-insights" id="insights-tab">
+    <div class="insights-header">
+        <h2>Risk Insights</h2>
+    </div>
+    
+    <button class="generate-button" onclick="generateInsights()">
+        Generate Insights
+    </button>
+
+    <div id="insights-container">
+        <!-- Initial insights will be populated here -->
+        <div class="insight-item">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>Select markers on the map to generate risk insights</div>
+        </div>
+    </div>
+</div>
+
+<!-- Calculator Tab Content -->
+<div class="risk-assessment" id="calculator-tab" style="display: none;">
+    <h2>Total Risk Assessment</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Policies</div>
+            <div class="stat-value">15</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Expected Loss</div>
+            <div class="stat-value danger">R 8,267,255.90</div>
+        </div>
+    </div>
+
+    <div class="risk-distribution">
+        <div class="risk-box high">
+            <div>High Risk</div>
+            <div class="risk-box-value">5</div>
+        </div>
+        <div class="risk-box medium">
+            <div>Medium Risk</div>
+            <div class="risk-box-value">5</div>
+        </div>
+        <div class="risk-box low">
+            <div>Low Risk</div>
+            <div class="risk-box-value">5</div>
+        </div>
+    </div>
+</div>
+</div>
+<script>
+// Add this to your script section
+function showTab(tabName) {
+    // Update tab buttons
+    const buttons = document.querySelectorAll('.tab-button');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    const currentTab = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+    currentTab.classList.add('active');
+    
+    // Show/hide appropriate content
+    const insightsTab = document.getElementById('insights-tab');
+    const calculatorTab = document.getElementById('calculator-tab');
+    
+    if (tabName === 'calculator') {
+        calculatorTab.style.display = 'block';
+        insightsTab.style.display = 'none';
+    } else {
+        insightsTab.style.display = 'block';
+        calculatorTab.style.display = 'none';
+    }
+}
+
+function generateInsights() {
+    const button = document.querySelector('.generate-button');
+    const container = document.getElementById('insights-container');
+    
+    // Show loading state
+    button.textContent = 'Generating...';
+    button.disabled = true;
+    
+    // Calculate current risk status
+    const riskStatus = {
+        highRisk: countMarkersInPath('High Risk'),
+        mediumRisk: countMarkersInPath('Medium Risk'),
+        totalExposure: calculateTotalExposure(),
+        coastalProperties: countCoastalProperties()
+    };
+    
+    // Define insights
+    const insights = [
+        {
+            icon: 'exclamation-triangle',
+            text: `Immediate alert required for ${riskStatus.highRisk} high-risk policy holders in direct storm path`
+        },
+        {
+            icon: 'bell',
+            text: `Send preparatory warnings to ${riskStatus.mediumRisk} medium-risk policy holders within 10km buffer zone`
+        },
+        {
+            icon: 'chart-bar',
+            text: `Estimated total exposure: R${riskStatus.totalExposure.toLocaleString()}`
+        },
+        {
+            icon: 'home',
+            text: `Recommend temporary relocation for ${riskStatus.coastalProperties} properties in high-risk coastal areas`
+        },
+        {
+            icon: 'phone',
+            text: 'Activate emergency response team and establish communication channels'
+        }
+    ];
+    
+    // Clear existing insights
+    container.innerHTML = '';
+    
+    // Add new insights with animation
+    insights.forEach((insight, index) => {
+        const insightElement = document.createElement('div');
+        insightElement.className = 'insight-item';
+        insightElement.style.opacity = '0';
+        insightElement.style.transform = 'translateY(-10px)';
+        insightElement.innerHTML = `
+            <i class="fas fa-${insight.icon}"></i>
+            <div>${insight.text}</div>
+        `;
+        container.appendChild(insightElement);
+        
+        // Animate each insight
+        setTimeout(() => {
+            insightElement.style.transition = 'all 0.3s ease';
+            insightElement.style.opacity = '1';
+            insightElement.style.transform = 'translateY(0)';
+        }, index * 200);
+    });
+    
+    // Reset button state
+    setTimeout(() => {
+        button.textContent = 'Generate Insights';
+        button.disabled = false;
+    }, insights.length * 200);
+}
+
+// Helper functions
+function countMarkersInPath(riskLevel) {
+    return markers.filter(marker => marker.risk === riskLevel).length;
+}
+
+function calculateTotalExposure() {
+    return markers.reduce((total, marker) => {
+        const value = parseInt(marker.value.replace('R', '').replace(',', ''));
+        return total + value;
+    }, 0);
+}
+
+function countCoastalProperties() {
+    return markers.filter(marker => isCoastalProperty(marker)).length;
+}
+
+function isCoastalProperty(marker) {
+    // Simplified coastal check (can be enhanced with actual coastline data)
+    const coastalLatitude = -34; // Approximate South African coast
+    return marker.lat < coastalLatitude;
+}
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    showTab('insights'); // Show insights tab by default
+});
+    function showTab(tabName) {
+        const buttons = document.querySelectorAll('.tab-button');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        
+        const currentTab = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+        currentTab.classList.add('active');
+        
+        const riskAssessment = document.querySelector('.risk-assessment');
+        const riskInsights = document.querySelector('.risk-insights');
+        
+        if (tabName === 'calculator') {
+            riskAssessment.style.display = 'block';
+            riskInsights.style.display = 'none';
+        } else {
+            riskInsights.style.display = 'block';
+            riskAssessment.style.display = 'none';
+        }
+    }
+
+    function generateInsights() {
+        const button = document.querySelector('.generate-button');
+        const container = document.getElementById('insights-container');
+        
+        button.textContent = 'Generating...';
+        button.disabled = true;
+        
+        setTimeout(() => {
+            const insights = container.children;
+            for (let i = 0; i < insights.length; i++) {
+                setTimeout(() => {
+                    insights[i].style.opacity = '0';
+                    insights[i].style.transform = 'translateY(-10px)';
+                    
+                    setTimeout(() => {
+                        insights[i].style.transition = 'all 0.3s ease';
+                        insights[i].style.opacity = '1';
+                        insights[i].style.transform = 'translateY(0)';
+                    }, 50);
+                }, i * 200);
+            }
+            
+            setTimeout(() => {
+                button.textContent = 'Generate Insights';
+                button.disabled = false;
+            }, insights.length * 200);
+        }, 1000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const insights = document.getElementById('insights-container').children;
+        for (let insight of insights) {
+            insight.style.opacity = '1';
+            insight.style.transition = 'all 0.3s ease';
+        }
+    });
+</script>
+</body>
+
+<!-- Add to the style section -->
+<style>
+    .risk-insights {
+        padding: 1.5rem;
+    }
+    
+    .insights-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .generate-button {
+        width: 100%;
+        padding: 0.8rem;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+        transition: background-color 0.3s ease;
+    }
+    
+    .generate-button:hover {
+        opacity: 0.9;
+    }
+    
+    .insight-item {
+        background-color: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+    
+    .insight-item i {
+        color: var(--accent-color);
+        font-size: 1.2rem;
+    }
+    
+    .risk-assessment {
+        padding: 1.5rem;
+        display: none;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+        background-color: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 8px;
+    }
+    
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    .stat-value.danger {
+        color: var(--high-risk-text);
+    }
+    
+    .risk-distribution {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+    
+    .risk-box {
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .risk-box.high {
+        background-color: var(--high-risk-bg);
+        color: var(--high-risk-text);
+    }
+    
+    .risk-box.medium {
+        background-color: var(--medium-risk-bg);
+        color: var(--medium-risk-text);
+    }
+    
+    .risk-box.low {
+        background-color: var(--low-risk-bg);
+        color: var(--low-risk-text);
+    }
+    
+    .risk-box-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+    
+    .popup-content {
+        padding: 10px;
+        line-height: 1.5;
+    }
+    </style>
+    
+    <!-- Replace the existing sidebar content with this -->
+<div class="sidebar">
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-button" onclick="showTab('calculator')">Risk Calculator</button>
+            <button class="tab-button active" onclick="showTab('insights')">Insights</button>
+        </div>
+    </div>
+
