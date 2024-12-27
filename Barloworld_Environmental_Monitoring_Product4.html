@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESG Monitoring Dashboard</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #7030A0;
+            --secondary-color: #475569;
+            --background-color: #f8fafc;
+            --card-background: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --success-green: #22c55e;
+            --alert-red: #ef4444;
+            --water-blue: #3b82f6;
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #9d4edd;
+            --secondary-color: #94a3b8;
+            --background-color: #1a1a1a;
+            --card-background: #2d2d2d;
+            --border-color: #404040;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --success-green: #4ade80;
+            --alert-red: #f87171;
+            --water-blue: #60a5fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+            transition: background-color 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--text-primary);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .map-container {
+            background: var(--card-background);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            height: 300px;
+        }
+
+        #map {
+            height: 100%;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .metric-card {
+            background: var(--card-background);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value.sites { color: var(--primary-color); }
+        .metric-value.alerts { color: var(--alert-red); }
+        .metric-value.biodiversity { color: var(--success-green); }
+        .metric-value.water { color: var(--water-blue); }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .insights-section {
+            background: var(--card-background);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            height: 100%;
+            position: sticky;
+            top: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .more-insights-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: all 0.2s;
+        }
+
+        .more-insights-btn:hover {
+            opacity: 0.9;
+        }
+
+        .insights-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .insight-item {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            position: relative;
+            color: var(--text-primary);
+        }
+
+        .insight-item::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary-color);
+        }
+
+        .site-selector {
+            width: 100%;
+            max-width: 300px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            background-color: var(--card-background);
+            color: var(--text-primary);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .insights-section {
+                position: relative;
+                top: 0;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+    </button>
+
+    <div class="container">
+        <div class="header">
+            <h1>Environmental Impact Monitoring Dashboard</h1>
+        </div>
+
+        <select class="site-selector" onchange="updateSiteData()">
+            <option value="">Select Site</option>
+            <option value="site1">Site 1 - Cape Town</option>
+            <option value="site2">Site 2 - Johannesburg</option>
+            <option value="site3">Site 3 - Durban</option>
+            <option value="site4">Site 4 - Pretoria</option>
+            <option value="site5">Site 5 - Port Elizabeth</option>
+        </select>
+
+        <div class="dashboard-grid">
+            <div class="main-content">
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            Active Sites Monitoring
+                        </div>
+                        <div class="metric-value sites">24/27</div>
+                        <div class="metric-label">Sites within threshold</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            Active Alerts
+                        </div>
+                        <div class="metric-value alerts">3</div>
+                        <div class="metric-label">Requiring attention</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                            </svg>
+                            Biodiversity Score
+                        </div>
+                        <div class="metric-value biodiversity">8.4/10</div>
+                        <div class="metric-label">Above target</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                            </svg>
+                            Water Quality
+                        </div>
+                        <div class="metric-value water">95%</div>
+                        <div class="metric-label">Compliance rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="insights-section">
+                    <div id="environmental-insights" class="insights-content"></div>
+                    <button class="more-insights-btn" onclick="generateEnvironmentalInsights()">
+                        Generate Insights
+                        <span class="ai-badge">AI</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        // Site Data Configuration
+        const siteData = {
+            site1: {
+                name: "Site 1 - Cape Town",
+                coords: [-33.9249, 18.4241],
+                activeCount: "24/27",
+                alerts: 3,
+                biodiversityScore: "8.4/10",
+                waterQuality: "95%",
+                alert: "Water usage exceeding monthly target by 15%"
+            },
+            site2: {
+                name: "Site 2 - Johannesburg",
+                coords: [-26.2041, 28.0473],
+                activeCount: "22/25",
+                alerts: 2,
+                biodiversityScore: "7.9/10",
+                waterQuality: "93%",
+                alert: "High energy consumption detected in Building B"
+            },
+            site3: {
+                name: "Site 3 - Durban",
+                coords: [-29.8587, 31.0218],
+                activeCount: "18/20",
+                alerts: 1,
+                biodiversityScore: "8.2/10",
+                waterQuality: "97%",
+                alert: null
+            },
+            site4: {
+                name: "Site 4 - Pretoria",
+                coords: [-25.7479, 28.2293],
+                activeCount: "15/16",
+                alerts: 0,
+                biodiversityScore: "8.6/10",
+                waterQuality: "96%",
+                alert: null
+            },
+            site5: {
+                name: "Site 5 - Port Elizabeth",
+                coords: [-33.9608, 25.6022],
+                activeCount: "12/15",
+                alerts: 2,
+                biodiversityScore: "7.8/10",
+                waterQuality: "94%",
+                alert: "Maintenance required for water treatment facility"
+            }
+        };
+
+        let map;
+        let currentMarkers = {};
+
+        function initializeMap() {
+            map = L.map('map').setView([-29.0852, 26.1596], 6);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        
+            Object.entries(siteData).forEach(([siteId, site]) => {
+                const marker = L.marker(site.coords)
+                    .bindPopup(`
+                        <b>${site.name}</b><br>
+                        Active Sites: ${site.activeCount}<br>
+                        Alerts: ${site.alerts}<br>
+                        Biodiversity Score: ${site.biodiversityScore}<br>
+                        Water Quality: ${site.waterQuality}
+                    `)
+                    .on('click', () => {
+                        document.querySelector('.site-selector').value = siteId;
+                        updateSiteData(siteId);
+                    });
+                
+                currentMarkers[siteId] = marker;
+                marker.addTo(map);
+            });
+        }
+
+        function updateSiteData(siteId = document.querySelector('.site-selector').value) {
+            if (!siteId || !siteData[siteId]) return;
+            
+            const site = siteData[siteId];
+            document.querySelector('.metric-value.sites').textContent = site.activeCount;
+            document.querySelector('.metric-value.alerts').textContent = site.alerts;
+            document.querySelector('.metric-value.biodiversity').textContent = site.biodiversityScore;
+            document.querySelector('.metric-value.water').textContent = site.waterQuality;
+            
+            map.setView(site.coords, 8);
+            Object.values(currentMarkers).forEach(marker => marker.closePopup());
+            currentMarkers[siteId].openPopup();
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function generateEnvironmentalInsights() {
+            const insightsContainer = document.getElementById('environmental-insights');
+            const selectedSite = document.querySelector('.site-selector').value;
+            const site = siteData[selectedSite];
+
+            if (!site) {
+                alert('Please select a site first');
+                return;
+            }
+
+            const insights = [
+                `Site Performance: ${site.name} is currently operating at ${site.activeCount} capacity, indicating ${parseInt(site.activeCount) > 80 ? 'optimal' : 'sub-optimal'} resource utilization.`,
+                `Alert Status: ${site.alerts} active alerts require attention${site.alert ? `, with priority focus on ${site.alert}` : ''}.`,
+                `Biodiversity Impact: Current score of ${site.biodiversityScore} shows ${parseFloat(site.biodiversityScore) > 8.0 ? 'positive' : 'moderate'} environmental management effectiveness.`,
+                `Water Management: ${site.waterQuality} compliance rate indicates ${parseInt(site.waterQuality) > 95 ? 'excellent' : 'good'} water quality control.`,
+                `Recommendation: ${generateSiteRecommendation(site)}`
+            ];
+
+            insightsContainer.innerHTML = '';
+            insights.forEach(insight => {
+                const insightElement = document.createElement('div');
+                insightElement.className = 'insight-item';
+                insightElement.textContent = insight;
+                insightsContainer.appendChild(insightElement);
+            });
+        }
+
+        function generateSiteRecommendation(site) {
+            const recommendations = [
+                'Implement advanced monitoring systems for real-time environmental impact tracking',
+                'Enhance biodiversity protection measures through habitat restoration initiatives',
+                'Upgrade water treatment facilities to improve quality metrics',
+                'Deploy additional air quality monitoring stations',
+                'Implement energy efficiency measures to reduce emissions'
+            ];
+            return recommendations[Math.floor(Math.random() * recommendations.length)];
+        }
+
+        window.onload = function() {
+            initializeMap();
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateSiteData('site1');
+        };
+    </script>
+</body>
+</html>
