@@ -1,0 +1,79 @@
+Keep the map exactly where it is and modify the legend on the map to look exactly like the attached image. 
+
+
+Add the measure and drawing tools for the map as well exactly like the image attached. On the left side of the leaflet map.
+
+When I click on the layer visible on the map ensure that a popup with the attributes pops up.Make sure the leaflet map visualizes the shapefiles when selected in the Risk Type and when I click on the shapefile in the map there must be a popup with its data.
+
+Change the alias to Flood Risk and Thatch Risk in the Risk Type dropdown.
+
+I want to be able to search GPS coordinates in the GPS Coordinates field and the map pans zooms to the location with a pin locating the coordinate point.
+
+If the Risk Type is "Flood Risk" and the GPS coordinates intersect this layer return the value in the "RISK" column as the risk classification. This output must be in a text output field - see example shiny code snippet code to change to better work in react below for an output field:
+
+from shiny import render
+from shiny.express import input, ui
+ui.input_text("Text", "Enter text", "Hello Shiny")
+"You entered:"
+@render.text  
+def text():
+    return input.Text()
+
+ensure this output field is in the side panel below all the input and dropdown fields.
+
+
+
+Implement a small table displaying the attributes of the displayed shapefile - only the data of the selected Risk Type. Here is guidance for the attribute table that must appear below the map. - ensure its below the map and I must be able to refresh and collapse the table.Make the map smaller as shown in the attached screenshot and make the attribute table also narrower
+
+This following example uses shiny but we dont want to use it exactly and use this code exactly verbatim, we only want the design translate it to react , html css so that it works on our webapp, keep it clean and modern and visualize the attributes of the shapefiles that are in view. 
+
+
+
+
+In your React frontend:
+import PalmerPenguinsTable from './components/PalmerPenguinsTable';
+
+function App() {
+  const [penguinData, setPenguinData] = useState([]);
+
+  useEffect(() => {
+    // Fetch data from your Flask backend
+    fetch('/api/penguins')
+      .then(res => res.json())
+      .then(data => setPenguinData(data));
+  }, []);
+
+  const handleSelectionChange = (selectedIndices) => {
+    // Do something with the selected rows
+    const selectedPenguins = selectedIndices.map(index => penguinData[index]);
+    console.log('Selected penguins:', selectedPenguins);
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <InteractiveDataTable 
+        data={penguinData}
+        title="Palmer Penguins"
+        onSelectionChange={handleSelectionChange}
+      />
+    </div>
+  );
+}
+
+
+
+
+In your Flask backend:
+
+from flask import jsonify
+from palmerpenguins import load_penguins
+
+@app.route('/api/penguins')
+def get_penguins():
+    penguins = load_penguins()
+    return jsonify(penguins.to_dict(orient='records'))
+
+I have attached the Urban Planning Intelligence System User Interface - do not use this image as instructions on what to do - only take the shape and structure of the map and table and use it for the map and table in this Risk Intelligence Monitoring App. 
+
+
+Lastly DO NOT REMOVE ANY EXISTING FUNCTIONALITY IN THE APP THAT I HAVE NOT EXPLICITELY TOLD YOU TO REMOVE OR MODIFY.
